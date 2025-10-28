@@ -74,6 +74,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 icon: Icons.shopping_cart_checkout_outlined,
                 accent: AppColors.accentMuted,
               ),
+              _MetricCard(
+                label: 'Retornos em atraso',
+                value: data.overdueReturns.toString(),
+                icon: Icons.assignment_late_outlined,
+                accent: data.overdueReturns > 0 ? Colors.redAccent : AppColors.accent,
+              ),
             ],
           ),
         );

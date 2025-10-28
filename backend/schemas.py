@@ -35,6 +35,8 @@ class ItemBase(BaseModel):
     quantity: int = 0
     minimum_quantity: int = 0
     locker_id: Optional[int] = None
+    is_supply: bool = False
+    max_return_time_hours: Optional[int] = Field(default=None, ge=1)
 
 
 class ItemCreate(ItemBase):
@@ -47,6 +49,8 @@ class ItemUpdate(BaseModel):
     quantity: Optional[int] = None
     minimum_quantity: Optional[int] = None
     locker_id: Optional[int] = None
+    is_supply: Optional[bool] = None
+    max_return_time_hours: Optional[int] = Field(default=None, ge=1)
 
 
 class ItemOut(ItemBase):
@@ -106,3 +110,23 @@ class InventorySnapshot(BaseModel):
     total_items: int
     low_stock_items: int
     pending_requests: int
+    overdue_returns: int
+
+
+class SupplyWithdrawalOut(BaseModel):
+    id: int
+    item: ItemOut
+    quantity_withdrawn: int
+    quantity_returned: int
+    withdrawn_at: datetime
+    due_at: Optional[datetime] = None
+    returned_at: Optional[datetime] = None
+    note: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
+
+class SupplyReturnRequest(BaseModel):
+    quantity: int = Field(..., gt=0)
+    note: Optional[str] = None

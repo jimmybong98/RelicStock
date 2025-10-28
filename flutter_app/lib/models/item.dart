@@ -7,8 +7,10 @@ class Item {
     required this.sku,
     required this.quantity,
     required this.minimumQuantity,
+    required this.isSupply,
     this.description,
     this.locker,
+    this.maxReturnTimeHours,
   });
 
   final int id;
@@ -18,6 +20,8 @@ class Item {
   final int minimumQuantity;
   final String? description;
   final Locker? locker;
+  final bool isSupply;
+  final int? maxReturnTimeHours;
 
   bool get isLowStock => quantity <= minimumQuantity;
 
@@ -30,6 +34,9 @@ class Item {
       minimumQuantity: json['minimum_quantity'] as int? ?? json['minimumQuantity'] as int? ?? 0,
       description: json['description'] as String?,
       locker: json['locker'] != null ? Locker.fromJson(json['locker'] as Map<String, dynamic>) : null,
+      isSupply: json['is_supply'] as bool? ?? json['isSupply'] as bool? ?? false,
+      maxReturnTimeHours: json['max_return_time_hours'] as int? ??
+          json['maxReturnTimeHours'] as int?,
     );
   }
 }

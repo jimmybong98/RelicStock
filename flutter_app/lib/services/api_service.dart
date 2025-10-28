@@ -40,6 +40,8 @@ class ApiService {
     required int minimumQuantity,
     String? description,
     int? lockerId,
+    bool isSupply = false,
+    int? maxReturnTimeHours,
   }) async {
     final body = jsonEncode({
       'name': name,
@@ -48,6 +50,8 @@ class ApiService {
       'minimum_quantity': minimumQuantity,
       'description': description,
       'locker_id': lockerId,
+      'is_supply': isSupply,
+      'max_return_time_hours': maxReturnTimeHours,
     });
     final response = await _client.post(
       _uri('/items'),
@@ -160,6 +164,35 @@ class ApiService {
     _throwIfNeeded(response);
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return data['base64_data'] as String;
+  }
+
+  Future<List<SupplyWithdrawal>> fetchSupplyWithdrawals({bool pendingOnly = true}) async {
+    final response = await _client.get(
+      _uri('/supply-withdrawals', {'pending_only': pendingOnly.toString()}),
+    );
+    _throwIfNeeded(response);
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((dynamic withdrawal) =>
+            SupplyWithdrawal.fromJson(withdrawal as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<SupplyWithdrawal> returnSupplyWithdrawal({
+    required int withdrawalId,
+    required int quantity,
+    String? note,
+  }) async {
+    final response = await _client.post(
+      _uri('/supply-withdrawals/$withdrawalId/return'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'quantity': quantity,
+        if (note != null) 'note': note,
+      }),
+    );
+    _throwIfNeeded(response);
+    return SupplyWithdrawal.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   static const _jsonHeaders = {'Content-Type': 'application/json'};

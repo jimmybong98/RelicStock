@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import base64
 import io
+from datetime import datetime, timedelta
 
 import qrcode
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -130,6 +131,28 @@ def register_movement(
     db.add(db_movement)
     db.flush()
     db.refresh(db_movement)
+
+    if (
+        movement.movement_type == models.MovementType.OUT
+        and db_item.is_supply
+    ):
+        due_at: datetime | None = None
+        if db_item.max_return_time_hours is not None:
+            due_at = db_movement.created_at + timedelta(
+                hours=db_item.max_return_time_hours
+            )
+        withdrawal = models.SupplyWithdrawal(
+            movement_id=db_movement.id,
+            item_id=db_item.id,
+            quantity_withdrawn=movement.quantity,
+            withdrawn_at=db_movement.created_at,
+            due_at=due_at,
+            note=movement.note,
+        )
+        db.add(withdrawal)
+        db.flush()
+        db.refresh(withdrawal)
+
     return db_movement
 
 
@@ -225,8 +248,81 @@ def get_snapshot(db: Session = Depends(get_db)):
         .filter(models.PurchaseRequest.status == models.PurchaseStatus.PENDING)
         .count()
     )
+    overdue_returns = (
+        db.query(models.SupplyWithdrawal)
+        .filter(models.SupplyWithdrawal.quantity_returned < models.SupplyWithdrawal.quantity_withdrawn)
+        .filter(models.SupplyWithdrawal.due_at.isnot(None))
+        .filter(models.SupplyWithdrawal.due_at < datetime.utcnow())
+        .count()
+    )
     return schemas.InventorySnapshot(
         total_items=total_items,
         low_stock_items=low_stock_items,
         pending_requests=pending_requests,
+        overdue_returns=overdue_returns,
     )
+
+
+@app.get(
+    "/supply-withdrawals",
+    response_model=list[schemas.SupplyWithdrawalOut],
+)
+def list_supply_withdrawals(
+    pending_only: bool = Query(True, description="List only pending withdrawals"),
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.SupplyWithdrawal).order_by(
+        models.SupplyWithdrawal.due_at.is_(None),
+        models.SupplyWithdrawal.due_at,
+        models.SupplyWithdrawal.withdrawn_at.desc(),
+    )
+    if pending_only:
+        query = query.filter(
+            models.SupplyWithdrawal.quantity_returned < models.SupplyWithdrawal.quantity_withdrawn
+        )
+    return query.all()
+
+
+@app.post(
+    "/supply-withdrawals/{withdrawal_id}/return",
+    response_model=schemas.SupplyWithdrawalOut,
+)
+def return_supply_withdrawal(
+    withdrawal_id: int,
+    data: schemas.SupplyReturnRequest,
+    db: Session = Depends(get_db),
+):
+    withdrawal = db.get(models.SupplyWithdrawal, withdrawal_id)
+    if withdrawal is None:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+
+    remaining = withdrawal.quantity_withdrawn - withdrawal.quantity_returned
+    if remaining <= 0:
+        raise HTTPException(status_code=400, detail="Withdrawal already completed")
+
+    if data.quantity > remaining:
+        raise HTTPException(
+            status_code=400,
+            detail="Returned quantity exceeds pending amount",
+        )
+
+    item = withdrawal.item
+    item.quantity += data.quantity
+
+    movement_note = data.note or f"Retorno de insumo #{withdrawal.id}"
+    movement = models.InventoryMovement(
+        item_id=item.id,
+        quantity=data.quantity,
+        movement_type=models.MovementType.IN,
+        note=movement_note,
+    )
+    withdrawal.quantity_returned += data.quantity
+    if withdrawal.quantity_returned >= withdrawal.quantity_withdrawn:
+        withdrawal.returned_at = datetime.utcnow()
+
+    db.add(item)
+    db.add(movement)
+    db.add(withdrawal)
+    db.flush()
+    db.refresh(withdrawal)
+    return withdrawal

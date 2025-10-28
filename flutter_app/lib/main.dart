@@ -4,6 +4,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/items_screen.dart';
 import 'screens/lockers_screen.dart';
 import 'screens/purchase_requests_screen.dart';
+import 'screens/supply_returns_screen.dart';
 import 'services/api_service.dart';
 import 'theme.dart';
 
@@ -36,6 +37,7 @@ class _HomePageState extends State<HomePage> {
   final GlobalKey<ItemsViewState> _itemsKey = GlobalKey();
   final GlobalKey<LockersViewState> _lockersKey = GlobalKey();
   final GlobalKey<PurchaseRequestsViewState> _requestsKey = GlobalKey();
+  final GlobalKey<SupplyReturnsViewState> _returnsKey = GlobalKey();
 
   int _selectedIndex = 0;
 
@@ -75,6 +77,11 @@ class _HomePageState extends State<HomePage> {
                 label: Text('Itens'),
               ),
               NavigationRailDestination(
+                icon: Icon(Icons.assignment_return_outlined),
+                selectedIcon: Icon(Icons.assignment_return),
+                label: Text('Retorno de insumos'),
+              ),
+              NavigationRailDestination(
                 icon: Icon(Icons.cases_outlined),
                 selectedIcon: Icon(Icons.cases_rounded),
                 label: Text('Armários'),
@@ -105,8 +112,10 @@ class _HomePageState extends State<HomePage> {
       case 1:
         return ItemsView(service: _service, key: _itemsKey);
       case 2:
-        return LockersView(service: _service, key: _lockersKey);
+        return SupplyReturnsView(service: _service, key: _returnsKey);
       case 3:
+        return LockersView(service: _service, key: _lockersKey);
+      case 4:
         return PurchaseRequestsView(service: _service, key: _requestsKey);
       default:
         return const SizedBox.shrink();
@@ -121,13 +130,13 @@ class _HomePageState extends State<HomePage> {
           icon: const Icon(Icons.add),
           label: const Text('Novo item'),
         );
-      case 2:
+      case 3:
         return FloatingActionButton.extended(
           onPressed: () => _lockersKey.currentState?.showCreateLockerDialog(),
           icon: const Icon(Icons.add_location_alt_outlined),
           label: const Text('Novo armário'),
         );
-      case 3:
+      case 4:
         return FloatingActionButton.extended(
           onPressed: () => _requestsKey.currentState?.showCreateRequestDialog(),
           icon: const Icon(Icons.playlist_add),
@@ -144,9 +153,12 @@ class _HomePageState extends State<HomePage> {
         await _itemsKey.currentState?.refresh();
         break;
       case 2:
-        await _lockersKey.currentState?.refresh();
+        await _returnsKey.currentState?.refresh();
         break;
       case 3:
+        await _lockersKey.currentState?.refresh();
+        break;
+      case 4:
         await _requestsKey.currentState?.refresh();
         break;
       default:

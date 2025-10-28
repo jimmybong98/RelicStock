@@ -101,7 +101,9 @@ class ItemsViewState extends State<ItemsView> {
     final descriptionController = TextEditingController();
     final quantityController = TextEditingController(text: '0');
     final minQuantityController = TextEditingController(text: '0');
+    final returnTimeController = TextEditingController();
     Locker? selectedLocker = _lockers.isNotEmpty ? _lockers.first : null;
+    bool isSupply = false;
 
     final formKey = GlobalKey<FormState>();
 
@@ -177,6 +179,40 @@ class ItemsViewState extends State<ItemsView> {
                               .toList(),
                           onChanged: (value) => setDialogState(() => selectedLocker = value),
                         ),
+                        const SizedBox(height: 16),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Item é um insumo com retorno obrigatório'),
+                          value: isSupply,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              isSupply = value;
+                              if (!value) {
+                                returnTimeController.clear();
+                              }
+                            });
+                          },
+                        ),
+                        if (isSupply) ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: returnTimeController,
+                            decoration: const InputDecoration(
+                              labelText: 'Tempo máximo para retorno (em horas)',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (value) {
+                              if (!isSupply) {
+                                return null;
+                              }
+                              final parsed = int.tryParse(value ?? '');
+                              if (parsed == null || parsed <= 0) {
+                                return 'Informe um tempo válido em horas';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -213,6 +249,7 @@ class ItemsViewState extends State<ItemsView> {
 
     final quantity = int.tryParse(quantityController.text) ?? 0;
     final minQuantity = int.tryParse(minQuantityController.text) ?? 0;
+    final maxReturnTime = int.tryParse(returnTimeController.text);
 
     try {
       await widget.service.createItem(
@@ -224,6 +261,8 @@ class ItemsViewState extends State<ItemsView> {
             ? null
             : descriptionController.text,
         lockerId: selectedLocker?.id,
+        isSupply: isSupply,
+        maxReturnTimeHours: isSupply ? maxReturnTime : null,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -452,6 +491,32 @@ class _ItemCard extends StatelessWidget {
                   .labelLarge
                   ?.copyWith(color: AppColors.textSecondary),
             ),
+            if (item.isSupply) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.recycling_outlined, size: 18, color: AppColors.accent),
+                    const SizedBox(width: 8),
+                    Text(
+                      item.maxReturnTimeHours != null
+                          ? 'Retorno até ${_formatReturnWindow(item.maxReturnTimeHours!)}'
+                          : 'Retorno obrigatório',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(color: AppColors.accent),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (item.description != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -506,6 +571,22 @@ class _ItemCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatReturnWindow(int hours) {
+    final days = hours ~/ 24;
+    final remainingHours = hours % 24;
+    final parts = <String>[];
+    if (days > 0) {
+      parts.add('$days dia${days > 1 ? 's' : ''}');
+    }
+    if (remainingHours > 0) {
+      parts.add('$remainingHours hora${remainingHours > 1 ? 's' : ''}');
+    }
+    if (parts.isEmpty) {
+      return '$hours hora${hours > 1 ? 's' : ''}';
+    }
+    return parts.join(' e ');
   }
 }
 
